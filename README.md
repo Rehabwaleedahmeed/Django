@@ -24,3 +24,10 @@ Users/auth API scaffold.
 - POST /api/categories/
 - POST /api/products/<id>/reviews/
 - DEL /api/products/<id>/reviews/
+- POST /api/sellers/register/
+- GET /api/sellers/me/
+- PUT /api/sellers/me/
+- GET /api/sellers/me/products/
+- GET /api/sellers/me/orders/
+- PATCH /api/sellers/me/orders/<id>/status/
+- GET /api/sellers/me/earnings/
