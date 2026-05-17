@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "users",
     "products",
     "orders",
+    "payments",
 ]
 
 MIDDLEWARE = [
@@ -114,6 +115,9 @@ EMAIL_USE_SSL = os.getenv("SMTP_USE_SSL", "false").lower() == "true"
 DEFAULT_FROM_EMAIL = os.getenv("FROM_EMAIL", "no-reply@example.com")
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 
 CLOUDINARY_STORAGE = {
     "CLOUD_NAME": os.getenv("CLOUDINARY_CLOUD_NAME", ""),

@@ -5,3 +5,4 @@ django-filter>=23.5
 cloudinary>=1.41
 django-cloudinary-storage>=0.3.0
 celery>=5.3
+stripe>=8.0
