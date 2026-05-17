@@ -1,16 +1,12 @@
-from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from products.models import Cart, Product
 from products.permissions import IsSellerOrAdmin
-from products.utils import DEFAULT_TAX_RATE, apply_discount, money
-from users.models import Address
-
-from .models import Order, OrderItem, OrderStatus, OrderStatusHistory, ShippingAddress
+from .models import Order, OrderStatus, OrderStatusHistory
 from .serializers import OrderCreateSerializer, OrderDetailSerializer, OrderStatusHistorySerializer
+from .services import place_order_from_cart
 from .tasks import send_order_status_email
 
 
@@ -27,81 +23,13 @@ class OrderViewSet(viewsets.ViewSet):
         serializer = OrderDetailSerializer(order)
         return Response(serializer.data)
 
-    @transaction.atomic
     def create(self, request):
         serializer = OrderCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
-        cart = Cart.objects.select_related("promo_code").filter(user=request.user).first()
-        if not cart:
-            return Response({"detail": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST)
-        cart_items = list(cart.items.select_related("product").order_by("id"))
-        if not cart_items:
-            return Response({"detail": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST)
-
-        product_ids = [item.product_id for item in cart_items]
-        products = Product.objects.select_for_update().filter(id__in=product_ids, is_deleted=False).in_bulk()
-
-        subtotal = money(0)
-        for item in cart_items:
-            product = products.get(item.product_id)
-            if not product or not product.in_stock:
-                return Response({"detail": f"Product {item.product_id} is unavailable"}, status=status.HTTP_400_BAD_REQUEST)
-            if item.quantity > product.stock_count:
-                return Response({"detail": f"Insufficient stock for {product.name}"}, status=status.HTTP_400_BAD_REQUEST)
-            subtotal += money(product.price * item.quantity)
-
-        discount = apply_discount(subtotal, cart.promo_code)
-        tax = money((subtotal - discount) * DEFAULT_TAX_RATE)
-        total = money(subtotal - discount + tax)
-
-        order = Order.objects.create(
-            user=request.user,
-            promo_code=cart.promo_code,
-            status=OrderStatus.PENDING,
-            subtotal=subtotal,
-            discount=discount,
-            tax=tax,
-            total=total,
-        )
-
-        shipping_data = serializer.validated_data.get("shipping_address")
-        if not shipping_data:
-            address = Address.objects.filter(user=request.user).first()
-            if address:
-                shipping_data = {
-                    "line1": address.line1,
-                    "line2": address.line2,
-                    "city": address.city,
-                    "state": address.state,
-                    "postal_code": address.postal_code,
-                    "country": address.country,
-                }
-
-        if shipping_data:
-            ShippingAddress.objects.create(order=order, **shipping_data)
-
-        items_to_create = []
-        for item in cart_items:
-            product = products[item.product_id]
-            unit_price = money(product.price)
-            line_total = money(unit_price * item.quantity)
-            items_to_create.append(
-                OrderItem(
-                    order=order,
-                    product=product,
-                    quantity=item.quantity,
-                    unit_price=unit_price,
-                    line_total=line_total,
-                )
-            )
-        OrderItem.objects.bulk_create(items_to_create)
-        OrderStatusHistory.objects.create(order=order, status=OrderStatus.PENDING, note="Order placed")
-
-        cart.items.all().delete()
-        cart.promo_code = None
-        cart.save(update_fields=["promo_code", "updated_at"])
-
+        try:
+            order = place_order_from_cart(request.user, serializer.validated_data.get("shipping_address"))
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(OrderDetailSerializer(order).data, status=status.HTTP_201_CREATED)
 
     def cancel(self, request, order_id=None):
