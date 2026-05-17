@@ -18,7 +18,11 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
+    "django_filters",
+    "cloudinary",
+    "cloudinary_storage",
     "users",
+    "products",
 ]
 
 MIDDLEWARE = [
@@ -82,6 +86,13 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
 }
 
 SIMPLE_JWT = {
@@ -102,3 +113,9 @@ EMAIL_USE_SSL = os.getenv("SMTP_USE_SSL", "false").lower() == "true"
 DEFAULT_FROM_EMAIL = os.getenv("FROM_EMAIL", "no-reply@example.com")
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+CLOUDINARY_STORAGE = {
+    "CLOUD_NAME": os.getenv("CLOUDINARY_CLOUD_NAME", ""),
+    "API_KEY": os.getenv("CLOUDINARY_API_KEY", ""),
+    "API_SECRET": os.getenv("CLOUDINARY_API_SECRET", ""),
+}
