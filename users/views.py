@@ -23,6 +23,7 @@ from .serializers import (
     EmailVerificationSerializer,
     build_token_pair,
 )
+from products.utils import merge_guest_cart
 
 
 class RegisterView(APIView):
@@ -64,6 +65,7 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
+        merge_guest_cart(request, user)
         tokens = build_token_pair(user)
         return Response(tokens)
 
