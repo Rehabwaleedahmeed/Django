@@ -1,5 +1,7 @@
 from django.db.models import Count, Sum
 from django.shortcuts import get_object_or_404
+from rest_framework import viewsets
+from rest_framework.decorators import action
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -7,12 +9,15 @@ from rest_framework.views import APIView
 
 from orders.models import Order, OrderItem, OrderStatus, OrderStatusHistory
 from orders.tasks import send_order_status_email
+from orders.services import restore_order_stock
 from products.models import Product
-from products.serializers import ProductListSerializer
+from products.permissions import IsAdminOnly
+from products.serializers import ProductListSerializer, ProductWriteSerializer
 
 from .models import ApprovalStatus, Earnings, SellerProfile
 from .permissions import IsApprovedSeller
 from .serializers import (
+    AdminSellerProfileSerializer,
     SellerRegisterSerializer,
     SellerProfileSerializer,
     SellerOrderSerializer,
@@ -53,6 +58,25 @@ class SellerProductsView(APIView):
         serializer = ProductListSerializer(products, many=True)
         return Response(serializer.data)
 
+    def post(self, request):
+        serializer = ProductWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        product = serializer.save(seller=request.user)
+        return Response(ProductWriteSerializer(product).data, status=status.HTTP_201_CREATED)
+
+    def patch(self, request, product_id=None):
+        product = get_object_or_404(Product, id=product_id, seller=request.user, is_deleted=False)
+        serializer = ProductWriteSerializer(product, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def delete(self, request, product_id=None):
+        product = get_object_or_404(Product, id=product_id, seller=request.user, is_deleted=False)
+        product.is_deleted = True
+        product.save(update_fields=["is_deleted"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class SellerOrderView(APIView):
     permission_classes = [IsAuthenticated, IsApprovedSeller]
@@ -91,6 +115,8 @@ class SellerOrderView(APIView):
 
         order.status = new_status
         order.save(update_fields=["status", "updated_at"])
+        if new_status == OrderStatus.CANCELLED:
+            restore_order_stock(order)
         OrderStatusHistory.objects.create(order=order, status=new_status, note="Status updated by seller")
         send_order_status_email.delay(order.id, new_status)
         return Response(SellerOrderSerializer(order, context={"seller": request.user}).data)
@@ -115,3 +141,31 @@ class EarningsView(APIView):
         earnings.total_orders = totals.get("total_orders") or 0
         earnings.save(update_fields=["total_sales", "total_orders", "updated_at"])
         return Response(EarningsSerializer(earnings).data)
+
+
+class AdminSellerViewSet(viewsets.ModelViewSet):
+    serializer_class = AdminSellerProfileSerializer
+    permission_classes = [IsAdminOnly]
+    http_method_names = ["get", "patch", "head", "options"]
+
+    def get_queryset(self):
+        return SellerProfile.objects.select_related("user").order_by("-created_at")
+
+    @action(detail=True, methods=["post"])
+    def approve(self, request, pk=None):
+        profile = self.get_object()
+        profile.status = ApprovalStatus.APPROVED
+        profile.save(update_fields=["status", "updated_at"])
+        user = profile.user
+        user.role = "seller"
+        user.is_active = True
+        user.save(update_fields=["role", "is_active"])
+        Earnings.objects.get_or_create(seller=user)
+        return Response(self.get_serializer(profile).data)
+
+    @action(detail=True, methods=["post"])
+    def suspend(self, request, pk=None):
+        profile = self.get_object()
+        profile.status = ApprovalStatus.SUSPENDED
+        profile.save(update_fields=["status", "updated_at"])
+        return Response(self.get_serializer(profile).data)

@@ -14,7 +14,10 @@ class OrderStatus(models.TextChoices):
 
 
 class Order(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="orders")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="orders", null=True, blank=True)
+    guest_email = models.EmailField(blank=True)
+    guest_name = models.CharField(max_length=255, blank=True)
+    guest_phone = models.CharField(max_length=40, blank=True)
     promo_code = models.ForeignKey(PromoCode, on_delete=models.SET_NULL, null=True, blank=True, related_name="orders")
     status = models.CharField(max_length=20, choices=OrderStatus.choices, default=OrderStatus.PENDING)
     subtotal = models.DecimalField(max_digits=12, decimal_places=2)

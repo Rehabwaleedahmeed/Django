@@ -2,6 +2,7 @@ Django>=4.2
 djangorestframework>=3.14
 djangorestframework-simplejwt>=5.3
 django-filter>=23.5
+django-cors-headers>=4.3
 cloudinary>=1.41
 django-cloudinary-storage>=0.3.0
 celery>=5.3

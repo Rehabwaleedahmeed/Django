@@ -72,6 +72,26 @@ class PromoCode(models.Model):
         return self.code
 
 
+class HomepageBanner(models.Model):
+    title = models.CharField(max_length=180)
+    subtitle = models.CharField(max_length=255, blank=True)
+    image_url = models.URLField(blank=True)
+    cta_label = models.CharField(max_length=80, blank=True)
+    cta_url = models.CharField(max_length=255, blank=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    starts_at = models.DateTimeField(null=True, blank=True)
+    ends_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order", "-created_at"]
+
+    def __str__(self) -> str:
+        return self.title
+
+
 class Cart(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="cart")
     promo_code = models.ForeignKey(PromoCode, on_delete=models.SET_NULL, null=True, blank=True, related_name="carts")

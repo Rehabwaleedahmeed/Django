@@ -1,11 +1,22 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from .views import CartItemView, CartSummaryView, CartView, CategoryViewSet, ProductViewSet, PromoCodeView
+from .views import (
+    CartItemView,
+    CartSummaryView,
+    CartView,
+    CategoryViewSet,
+    HomepageBannerViewSet,
+    ProductViewSet,
+    PromoCodeAdminViewSet,
+    PromoCodeView,
+)
 
 router = DefaultRouter()
 router.register(r"products", ProductViewSet, basename="products")
 router.register(r"categories", CategoryViewSet, basename="categories")
+router.register(r"banners", HomepageBannerViewSet, basename="banners")
+router.register(r"admin/promo-codes", PromoCodeAdminViewSet, basename="admin-promo-codes")
 
 urlpatterns = [
 	path("cart/", CartView.as_view({"get": "get", "delete": "delete"}), name="cart"),

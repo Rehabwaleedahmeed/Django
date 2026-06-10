@@ -26,6 +26,9 @@ class OrderStatusHistorySerializer(serializers.ModelSerializer):
 
 class OrderCreateSerializer(serializers.Serializer):
     shipping_address = ShippingAddressSerializer(required=False)
+    guest_email = serializers.EmailField(required=False, allow_blank=True)
+    guest_name = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    guest_phone = serializers.CharField(required=False, allow_blank=True, max_length=40)
 
 
 class OrderDetailSerializer(serializers.ModelSerializer):
@@ -33,6 +36,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
     shipping_address = ShippingAddressSerializer(read_only=True)
     status_history = OrderStatusHistorySerializer(many=True, read_only=True)
     promo_code = serializers.SerializerMethodField()
+    buyer = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -44,6 +48,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
             "tax",
             "total",
             "promo_code",
+            "buyer",
             "created_at",
             "items",
             "shipping_address",
@@ -52,3 +57,8 @@ class OrderDetailSerializer(serializers.ModelSerializer):
 
     def get_promo_code(self, obj):
         return obj.promo_code.code if obj.promo_code else None
+
+    def get_buyer(self, obj):
+        if obj.user_id:
+            return {"id": obj.user_id, "email": obj.user.email, "name": obj.user.name, "guest": False}
+        return {"id": None, "email": obj.guest_email, "name": obj.guest_name, "phone": obj.guest_phone, "guest": True}

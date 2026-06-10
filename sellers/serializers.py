@@ -34,6 +34,11 @@ class SellerProfileSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "email", "name", "status", "created_at", "updated_at"]
 
 
+class AdminSellerProfileSerializer(SellerProfileSerializer):
+    class Meta(SellerProfileSerializer.Meta):
+        read_only_fields = ["id", "email", "name", "created_at", "updated_at"]
+
+
 class SellerOrderItemSerializer(serializers.ModelSerializer):
     product = ProductListSerializer(read_only=True)
 
@@ -56,7 +61,9 @@ class SellerOrderSerializer(serializers.ModelSerializer):
         return SellerOrderItemSerializer(items, many=True).data
 
     def get_buyer(self, obj):
-        return {"id": obj.user_id, "email": obj.user.email}
+        if obj.user_id:
+            return {"id": obj.user_id, "email": obj.user.email}
+        return {"id": None, "email": obj.guest_email, "guest": True}
 
 
 class EarningsSerializer(serializers.ModelSerializer):

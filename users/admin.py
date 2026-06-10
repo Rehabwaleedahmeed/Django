@@ -7,12 +7,12 @@ from .models import CustomUser, Address, Wishlist
 @admin.register(CustomUser)
 class UserAdmin(DjangoUserAdmin):
     model = CustomUser
-    list_display = ["email", "name", "role", "is_active", "is_staff"]
+    list_display = ["email", "name", "role", "is_active", "is_deleted", "is_staff"]
     ordering = ["email"]
     fieldsets = (
         (None, {"fields": ("email", "password")}),
         ("Profile", {"fields": ("name", "avatar", "role")}),
-        ("Status", {"fields": ("is_active", "is_staff", "is_superuser", "email_verified")}),
+        ("Status", {"fields": ("is_active", "is_deleted", "is_staff", "is_superuser", "email_verified")}),
         ("Permissions", {"fields": ("groups", "user_permissions")}),
         ("Important dates", {"fields": ("last_login",)}),
     )
