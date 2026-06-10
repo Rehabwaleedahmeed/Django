@@ -62,6 +62,12 @@ class SellerProductsView(APIView):
         serializer = ProductWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         product = serializer.save(seller=request.user)
+        
+        image_file = request.FILES.get("image")
+        if image_file:
+            from products.models import ProductImage
+            ProductImage.objects.create(product=product, image=image_file, is_primary=True)
+            
         return Response(ProductWriteSerializer(product).data, status=status.HTTP_201_CREATED)
 
     def patch(self, request, product_id=None):
@@ -69,6 +75,13 @@ class SellerProductsView(APIView):
         serializer = ProductWriteSerializer(product, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        
+        image_file = request.FILES.get("image")
+        if image_file:
+            from products.models import ProductImage
+            ProductImage.objects.filter(product=product).update(is_primary=False)
+            ProductImage.objects.create(product=product, image=image_file, is_primary=True)
+            
         return Response(serializer.data)
 
     def delete(self, request, product_id=None):

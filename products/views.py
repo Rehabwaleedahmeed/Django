@@ -91,7 +91,19 @@ class ProductViewSet(viewsets.ModelViewSet):
         return [AllowAny()]
 
     def perform_create(self, serializer):
-        serializer.save(seller=self.request.user)
+        product = serializer.save(seller=self.request.user)
+        image_file = self.request.FILES.get("image")
+        if image_file:
+            from .models import ProductImage
+            ProductImage.objects.create(product=product, image=image_file, is_primary=True)
+
+    def perform_update(self, serializer):
+        product = serializer.save()
+        image_file = self.request.FILES.get("image")
+        if image_file:
+            from .models import ProductImage
+            ProductImage.objects.filter(product=product).update(is_primary=False)
+            ProductImage.objects.create(product=product, image=image_file, is_primary=True)
 
     def perform_destroy(self, instance):
         instance.is_deleted = True
