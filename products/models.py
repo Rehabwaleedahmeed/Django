@@ -1,6 +1,5 @@
 from django.conf import settings
 from django.db import models
-from cloudinary.models import CloudinaryField
 
 
 class Category(models.Model):
@@ -30,7 +29,7 @@ class Product(models.Model):
 
 class ProductImage(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="images")
-    image = CloudinaryField("image")
+    image = models.ImageField(upload_to="products/images/")
     is_primary = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 

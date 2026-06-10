@@ -1,6 +1,5 @@
 from django.conf import settings
 from django.db import models
-from cloudinary.models import CloudinaryField
 
 
 class ApprovalStatus(models.TextChoices):
@@ -13,7 +12,7 @@ class SellerProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="seller_profile")
     store_name = models.CharField(max_length=255)
     bio = models.TextField(blank=True)
-    logo = CloudinaryField("image", blank=True, null=True)
+    logo = models.ImageField(upload_to="sellers/logos/", blank=True, null=True)
     status = models.CharField(max_length=20, choices=ApprovalStatus.choices, default=ApprovalStatus.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
