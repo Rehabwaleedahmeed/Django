@@ -20,13 +20,18 @@ class AddressSerializer(serializers.ModelSerializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
+    role = serializers.ChoiceField(
+        choices=[(CustomUser.Role.CUSTOMER, "Customer"), (CustomUser.Role.SELLER, "Seller")],
+        default=CustomUser.Role.CUSTOMER
+    )
 
     class Meta:
         model = CustomUser
-        fields = ["email", "password", "name"]
+        fields = ["email", "password", "name", "role"]
 
     def create(self, validated_data):
-        user = CustomUser.objects.create_user(role=CustomUser.Role.CUSTOMER, **validated_data)
+        role = validated_data.pop("role", CustomUser.Role.CUSTOMER)
+        user = CustomUser.objects.create_user(role=role, **validated_data)
         return user
 
     def validate_password(self, value):
