@@ -22,6 +22,7 @@ from .serializers import (
     SellerProfileSerializer,
     SellerOrderSerializer,
     EarningsSerializer,
+    SellerReviewSerializer,
 )
 
 
@@ -40,11 +41,11 @@ class SellerProfileView(APIView):
 
     def get(self, request):
         profile = get_object_or_404(SellerProfile, user=request.user)
-        return Response(SellerProfileSerializer(profile).data)
+        return Response(SellerProfileSerializer(profile, context={"request": request}).data)
 
     def put(self, request):
         profile = get_object_or_404(SellerProfile, user=request.user)
-        serializer = SellerProfileSerializer(profile, data=request.data, partial=True)
+        serializer = SellerProfileSerializer(profile, data=request.data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
@@ -55,7 +56,7 @@ class SellerProductsView(APIView):
 
     def get(self, request):
         products = Product.objects.filter(seller=request.user, is_deleted=False).order_by("-created_at")
-        serializer = ProductListSerializer(products, many=True)
+        serializer = ProductListSerializer(products, many=True, context={"request": request})
         return Response(serializer.data)
 
     def post(self, request):
@@ -102,7 +103,7 @@ class SellerOrderView(APIView):
             .prefetch_related("items__product")
             .order_by("-created_at")
         )
-        serializer = SellerOrderSerializer(orders, many=True, context={"seller": request.user})
+        serializer = SellerOrderSerializer(orders, many=True, context={"seller": request.user, "request": request})
         return Response(serializer.data)
 
     def patch(self, request, order_id=None):
@@ -132,7 +133,7 @@ class SellerOrderView(APIView):
             restore_order_stock(order)
         OrderStatusHistory.objects.create(order=order, status=new_status, note="Status updated by seller")
         send_order_status_email.delay(order.id, new_status)
-        return Response(SellerOrderSerializer(order, context={"seller": request.user}).data)
+        return Response(SellerOrderSerializer(order, context={"seller": request.user, "request": request}).data)
 
 
 class EarningsView(APIView):
@@ -154,6 +155,16 @@ class EarningsView(APIView):
         earnings.total_orders = totals.get("total_orders") or 0
         earnings.save(update_fields=["total_sales", "total_orders", "updated_at"])
         return Response(EarningsSerializer(earnings).data)
+
+
+class SellerReviewsView(APIView):
+    permission_classes = [IsAuthenticated, IsApprovedSeller]
+
+    def get(self, request):
+        from products.models import Review
+        reviews = Review.objects.filter(product__seller=request.user).select_related("product", "user").order_by("-created_at")
+        serializer = SellerReviewSerializer(reviews, many=True)
+        return Response(serializer.data)
 
 
 class AdminSellerViewSet(viewsets.ModelViewSet):

@@ -157,6 +157,13 @@ class WalletView(APIView):
         wallet, _ = Wallet.objects.get_or_create(user=request.user)
         return Response(WalletSerializer(wallet).data)
 
+    def post(self, request):
+        wallet, _ = Wallet.objects.get_or_create(user=request.user)
+        amount = Decimal(str(request.data.get("amount") or "100.00"))
+        wallet.balance += amount
+        wallet.save(update_fields=["balance", "updated_at"])
+        return Response(WalletSerializer(wallet).data)
+
 
 class WalletPayView(APIView):
     permission_classes = [IsAuthenticated]

@@ -58,7 +58,7 @@ class SellerOrderSerializer(serializers.ModelSerializer):
     def get_items(self, obj):
         seller = self.context.get("seller")
         items = obj.items.filter(product__seller=seller)
-        return SellerOrderItemSerializer(items, many=True).data
+        return SellerOrderItemSerializer(items, many=True, context=self.context).data
 
     def get_buyer(self, obj):
         if obj.user_id:
@@ -71,3 +71,13 @@ class EarningsSerializer(serializers.ModelSerializer):
         model = Earnings
         fields = ["total_sales", "total_orders", "updated_at"]
         read_only_fields = ["total_sales", "total_orders", "updated_at"]
+
+
+class SellerReviewSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    user_name = serializers.CharField(source="user.name", read_only=True)
+
+    class Meta:
+        from products.models import Review
+        model = Review
+        fields = ["id", "rating", "comment", "created_at", "user_name", "product_id", "product_name"]

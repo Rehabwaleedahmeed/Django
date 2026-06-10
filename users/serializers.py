@@ -121,7 +121,7 @@ class WishlistSerializer(serializers.ModelSerializer):
             .prefetch_related("images")
             .first()
         )
-        return ProductListSerializer(product).data if product else None
+        return ProductListSerializer(product, context=self.context).data if product else None
 
 
 class TokenSerializer(serializers.Serializer):

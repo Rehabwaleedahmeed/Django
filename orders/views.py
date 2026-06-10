@@ -3,8 +3,7 @@ from rest_framework import status, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from products.permissions import IsSellerOrAdmin
-from products.permissions import IsAdminOnly
+from products.permissions import IsSellerOrAdmin, IsAdminOnly
 from .models import Order, OrderStatus, OrderStatusHistory
 from .serializers import OrderCreateSerializer, OrderDetailSerializer, OrderStatusHistorySerializer
 from .services import place_guest_order_from_cart, place_order_from_cart, restore_order_stock
@@ -18,14 +17,14 @@ class OrderViewSet(viewsets.ViewSet):
         if not request.user.is_authenticated:
             return Response({"detail": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
         orders = Order.objects.filter(user=request.user).order_by("-created_at")
-        serializer = OrderDetailSerializer(orders, many=True)
+        serializer = OrderDetailSerializer(orders, many=True, context={"request": request})
         return Response(serializer.data)
 
     def retrieve(self, request, order_id=None):
         if not request.user.is_authenticated:
             return Response({"detail": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
         order = get_object_or_404(Order, id=order_id, user=request.user)
-        serializer = OrderDetailSerializer(order)
+        serializer = OrderDetailSerializer(order, context={"request": request})
         return Response(serializer.data)
 
     def create(self, request):
@@ -40,7 +39,7 @@ class OrderViewSet(viewsets.ViewSet):
                 order = place_guest_order_from_cart(request.session, serializer.validated_data, serializer.validated_data.get("shipping_address"))
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(OrderDetailSerializer(order).data, status=status.HTTP_201_CREATED)
+        return Response(OrderDetailSerializer(order, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
     def cancel(self, request, order_id=None):
         if not request.user.is_authenticated:
@@ -53,7 +52,7 @@ class OrderViewSet(viewsets.ViewSet):
         restore_order_stock(order)
         OrderStatusHistory.objects.create(order=order, status=OrderStatus.CANCELLED, note="Cancelled by user")
         send_order_status_email.delay(order.id, order.status)
-        return Response(OrderDetailSerializer(order).data)
+        return Response(OrderDetailSerializer(order, context={"request": request}).data)
 
 
 class OrderStatusView(viewsets.ViewSet):
@@ -99,7 +98,7 @@ class OrderStatusView(viewsets.ViewSet):
             restore_order_stock(order)
         OrderStatusHistory.objects.create(order=order, status=new_status, note="Status updated")
         send_order_status_email.delay(order.id, new_status)
-        return Response(OrderDetailSerializer(order).data)
+        return Response(OrderDetailSerializer(order, context={"request": request}).data)
 
 
 class AdminOrderViewSet(viewsets.ModelViewSet):

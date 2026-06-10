@@ -56,7 +56,12 @@ class ProductImageSerializer(serializers.ModelSerializer):
         fields = ["id", "image", "is_primary"]
 
     def get_image(self, obj) -> str:
-        return obj.image.url if obj.image else ""
+        if not obj.image:
+            return ""
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(obj.image.url)
+        return obj.image.url
 
 
 class ProductListSerializer(serializers.ModelSerializer):
@@ -67,10 +72,20 @@ class ProductListSerializer(serializers.ModelSerializer):
         model = Product
         fields = ["id", "name", "price", "avg_rating", "in_stock", "stock_count", "category", "primary_image"]
 
+    def to_representation(self, instance):
+        if isinstance(instance, dict):
+            return instance
+        return super().to_representation(instance)
+
     def get_primary_image(self, obj) -> str | None:
         images = list(obj.images.all())
         primary = next((image for image in images if image.is_primary), images[0] if images else None)
-        return primary.image.url if primary and primary.image else None
+        if not (primary and primary.image):
+            return None
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(primary.image.url)
+        return primary.image.url
 
 
 class ProductDetailSerializer(serializers.ModelSerializer):
@@ -78,6 +93,8 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, read_only=True)
     reviews = serializers.SerializerMethodField()
     seller = serializers.SerializerMethodField()
+    user_has_purchased = serializers.SerializerMethodField()
+    user_has_reviewed = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -93,6 +110,8 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             "images",
             "reviews",
             "seller",
+            "user_has_purchased",
+            "user_has_reviewed",
         ]
 
     def get_reviews(self, obj):
@@ -105,6 +124,23 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             "name": obj.seller.name,
             "store_name": profile.store_name if profile else "",
         }
+
+    def get_user_has_purchased(self, obj) -> bool:
+        request = self.context.get("request")
+        if not request or not request.user or not request.user.is_authenticated:
+            return False
+        from orders.models import Order, OrderStatus
+        return Order.objects.filter(
+            user=request.user,
+            items__product=obj
+        ).exclude(status=OrderStatus.CANCELLED).exists()
+
+    def get_user_has_reviewed(self, obj) -> bool:
+        request = self.context.get("request")
+        if not request or not request.user or not request.user.is_authenticated:
+            return False
+        from products.models import Review
+        return Review.objects.filter(product=obj, user=request.user).exists()
 
 
 class ProductWriteSerializer(serializers.ModelSerializer):
@@ -144,6 +180,11 @@ class CartItemSerializer(serializers.ModelSerializer):
         model = CartItem
         fields = ["id", "product", "product_id", "quantity", "line_total"]
         read_only_fields = ["id", "product", "line_total"]
+
+    def to_representation(self, instance):
+        if isinstance(instance, dict):
+            return instance
+        return super().to_representation(instance)
 
     def get_line_total(self, obj) -> str:
         if isinstance(obj, dict):

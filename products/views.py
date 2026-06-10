@@ -88,6 +88,8 @@ class ProductViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in {"create", "update", "partial_update", "destroy"}:
             return [IsSellerOrAdmin()]
+        if self.action == "reviews":
+            return [IsAuthenticated()]
         return [AllowAny()]
 
     def perform_create(self, serializer):
@@ -118,6 +120,24 @@ class ProductViewSet(viewsets.ModelViewSet):
                 return Response({"detail": "Review not found"}, status=status.HTTP_404_NOT_FOUND)
             review.delete()
             return Response({"detail": "Review deleted"})
+
+        if request.user.role == "seller":
+            return Response({"detail": "Sellers cannot submit reviews."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from orders.models import Order, OrderStatus
+        has_purchased = Order.objects.filter(
+            user=request.user,
+            items__product=product
+        ).exclude(status=OrderStatus.CANCELLED).exists()
+
+        if not has_purchased:
+            return Response(
+                {"detail": "You can only review products you have purchased."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if Review.objects.filter(product=product, user=request.user).exists():
+            return Response({"detail": "You have already reviewed this product."}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = ReviewSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -152,7 +172,7 @@ class CartMixin:
             items.append(
                 {
                     "id": product.id,
-                    "product": ProductListSerializer(product).data,
+                    "product": ProductListSerializer(product, context={"request": self.request}).data,
                     "quantity": quantity,
                     "line_total": str(money(product.price * quantity)),
                     "price": product.price,
@@ -164,7 +184,7 @@ class CartMixin:
         if self.request.user.is_authenticated:
             cart = self.get_user_cart()
             items = cart.items.select_related("product", "product__category", "product__seller").order_by("id")
-            items_data = CartItemSerializer(items, many=True).data
+            items_data = CartItemSerializer(items, many=True, context={"request": self.request}).data
             promo_code = cart.promo_code.code if cart.promo_code else None
             subtotal = get_cart_subtotal(
                 [{"quantity": item.quantity, "price": item.product.price} for item in items]
@@ -190,7 +210,7 @@ class CartMixin:
 
     def build_response(self):
         payload = self.get_cart_data()
-        serializer = CartSerializer(payload)
+        serializer = CartSerializer(payload, context={"request": self.request})
         return Response(serializer.data)
 
     def get_product_and_quantity(self, request):
@@ -208,7 +228,7 @@ class CartMixin:
     def serialize_guest_item(self, product, quantity):
         return {
             "id": product.id,
-            "product": ProductListSerializer(product).data,
+            "product": ProductListSerializer(product, context={"request": self.request}).data,
             "quantity": quantity,
             "line_total": str(money(product.price * quantity)),
             "price": product.price,
@@ -252,7 +272,7 @@ class CartItemView(CartMixin, viewsets.ViewSet):
                 item.save(update_fields=["quantity", "updated_at"])
             else:
                 item.refresh_from_db()
-            serializer = CartItemSerializer(item)
+            serializer = CartItemSerializer(item, context={"request": self.request})
             return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
         guest_cart = get_guest_cart(request.session)
@@ -287,7 +307,7 @@ class CartItemView(CartMixin, viewsets.ViewSet):
                 return Response({"detail": "Requested quantity exceeds stock"}, status=status.HTTP_400_BAD_REQUEST)
             item.quantity = quantity
             item.save(update_fields=["quantity", "updated_at"])
-            return Response(CartItemSerializer(item).data)
+            return Response(CartItemSerializer(item, context={"request": self.request}).data)
 
         guest_cart = get_guest_cart(request.session)
         item = next((entry for entry in guest_cart["items"] if entry.get("product_id") == item_id), None)

@@ -180,7 +180,7 @@ class WishlistView(APIView):
 
     def get(self, request):
         items = Wishlist.objects.filter(user=request.user).order_by("-created_at")
-        serializer = WishlistSerializer(items, many=True)
+        serializer = WishlistSerializer(items, many=True, context={"request": request})
         return Response(serializer.data)
 
     def post(self, request):
