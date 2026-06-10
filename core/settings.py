@@ -4,7 +4,7 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret-key")
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-secret-key-change-before-production-2026")
 DEBUG = os.getenv("DJANGO_DEBUG", "true").lower() == "true"
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",")
 
@@ -19,6 +19,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
     "django_filters",
+    "corsheaders",
     "cloudinary",
     "cloudinary_storage",
     "users",
@@ -30,6 +31,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -106,16 +108,33 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = os.getenv("SMTP_HOST", "")
+EMAIL_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
 EMAIL_PORT = int(os.getenv("SMTP_PORT", "587"))
-EMAIL_HOST_USER = os.getenv("SMTP_USER", "")
-EMAIL_HOST_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+EMAIL_HOST_USER = os.getenv("SMTP_USER", "keroraed123@gmail.com")
+EMAIL_HOST_PASSWORD = os.getenv("SMTP_PASSWORD", "tohq tymm anbx zcqm")
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.smtp.EmailBackend"
+    if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD
+    else "django.core.mail.backends.console.EmailBackend",
+)
 EMAIL_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
 EMAIL_USE_SSL = os.getenv("SMTP_USE_SSL", "false").lower() == "true"
-DEFAULT_FROM_EMAIL = os.getenv("FROM_EMAIL", "no-reply@example.com")
+DEFAULT_FROM_EMAIL = os.getenv("FROM_EMAIL", EMAIL_HOST_USER or "no-reply@example.com")
 
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://127.0.0.1:4200")
+EMAIL_OTP_EXPIRY_MINUTES = int(os.getenv("EMAIL_OTP_EXPIRY_MINUTES", "10"))
+EMAIL_OTP_RESEND_SECONDS = int(os.getenv("EMAIL_OTP_RESEND_SECONDS", "60"))
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:4200,http://127.0.0.1:4200",
+    ).split(",")
+    if origin.strip()
+]
+CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
 
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")

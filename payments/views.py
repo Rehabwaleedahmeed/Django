@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.http import HttpRequest
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -162,16 +163,21 @@ class WalletPayView(APIView):
 
     def post(self, request):
         try:
-            order = place_order_from_cart(request.user, request.data.get("shipping_address"))
-            wallet_deduct(request.user, order.total, order=order, reference=f"order-{order.id}")
+            with transaction.atomic():
+                totals = calculate_cart_totals(request.user, lock=True)
+                wallet = Wallet.objects.select_for_update().filter(user=request.user).first()
+                if not wallet or wallet.balance < totals["total"]:
+                    raise ValueError("Insufficient wallet balance")
+                order = place_order_from_cart(request.user, request.data.get("shipping_address"))
+                wallet_deduct(request.user, order.total, order=order, reference=f"order-{order.id}")
+                Payment.objects.create(
+                    user=request.user,
+                    order=order,
+                    method=PaymentMethod.WALLET,
+                    status=PaymentStatus.SUCCEEDED,
+                    amount=order.total,
+                    currency="usd",
+                )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        Payment.objects.create(
-            user=request.user,
-            order=order,
-            method=PaymentMethod.WALLET,
-            status=PaymentStatus.SUCCEEDED,
-            amount=order.total,
-            currency="usd",
-        )
         return Response({"detail": "Wallet payment completed", "order_id": order.id}, status=status.HTTP_201_CREATED)

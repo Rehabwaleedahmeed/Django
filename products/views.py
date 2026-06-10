@@ -1,4 +1,6 @@
 from django.shortcuts import get_object_or_404
+from django.db.models import Q
+from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
@@ -7,13 +9,15 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 
 from .filters import ProductFilter
-from .models import Cart, CartItem, Category, Product, PromoCode, Review
+from .models import Cart, CartItem, Category, HomepageBanner, Product, PromoCode, Review
 from .permissions import IsSellerOrAdmin, IsAdminOnly
 from .serializers import (
     CartItemSerializer,
     CartSerializer,
     CartSummarySerializer,
     CategorySerializer,
+    HomepageBannerSerializer,
+    PromoCodeSerializer,
     ProductListSerializer,
     ProductDetailSerializer,
     ProductWriteSerializer,
@@ -32,6 +36,34 @@ class CategoryViewSet(viewsets.ModelViewSet):
         return [AllowAny()]
 
 
+class PromoCodeAdminViewSet(viewsets.ModelViewSet):
+    serializer_class = PromoCodeSerializer
+    permission_classes = [IsAdminOnly]
+
+    def get_queryset(self):
+        return PromoCode.objects.all().order_by("code")
+
+
+class HomepageBannerViewSet(viewsets.ModelViewSet):
+    serializer_class = HomepageBannerSerializer
+    ordering = ["sort_order", "-created_at"]
+
+    def get_queryset(self):
+        queryset = HomepageBanner.objects.all()
+        if not self.request.user.is_authenticated or not self.request.user.is_staff:
+            now = timezone.now()
+            queryset = queryset.filter(is_active=True).filter(
+                Q(starts_at__isnull=True) | Q(starts_at__lte=now),
+                Q(ends_at__isnull=True) | Q(ends_at__gte=now),
+            )
+        return queryset.order_by("sort_order", "-created_at")
+
+    def get_permissions(self):
+        if self.action in {"create", "update", "partial_update", "destroy"}:
+            return [IsAdminOnly()]
+        return [AllowAny()]
+
+
 class ProductViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = ProductFilter
@@ -40,7 +72,11 @@ class ProductViewSet(viewsets.ModelViewSet):
     ordering = ["-created_at"]
 
     def get_queryset(self):
-        return Product.objects.filter(is_deleted=False).select_related("category", "seller").prefetch_related("images")
+        return (
+            Product.objects.filter(is_deleted=False)
+            .select_related("category", "seller", "seller__seller_profile")
+            .prefetch_related("images")
+        )
 
     def get_serializer_class(self):
         if self.action in {"list"}:

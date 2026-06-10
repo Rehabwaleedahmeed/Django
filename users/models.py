@@ -36,10 +36,14 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     avatar = models.URLField(blank=True)
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.CUSTOMER)
     is_active = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
     email_verified = models.BooleanField(default=False)
     email_verification_token = models.UUIDField(default=uuid.uuid4, editable=False)
+    email_otp = models.CharField(max_length=6, blank=True)
+    email_otp_sent_at = models.DateTimeField(null=True, blank=True)
+    email_otp_attempts = models.PositiveSmallIntegerField(default=0)
 
     objects = UserManager()
 

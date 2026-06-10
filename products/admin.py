@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Category, Product, ProductImage, Review
+from .models import Category, HomepageBanner, Product, ProductImage, PromoCode, Review
 
 
 @admin.register(Category)
@@ -26,3 +26,17 @@ class ProductAdmin(admin.ModelAdmin):
 class ReviewAdmin(admin.ModelAdmin):
     list_display = ["product", "user", "rating", "created_at"]
     list_filter = ["rating"]
+
+
+@admin.register(PromoCode)
+class PromoCodeAdmin(admin.ModelAdmin):
+    list_display = ["code", "discount_type", "value", "minimum_order_amount", "is_active"]
+    list_filter = ["discount_type", "is_active"]
+    search_fields = ["code"]
+
+
+@admin.register(HomepageBanner)
+class HomepageBannerAdmin(admin.ModelAdmin):
+    list_display = ["title", "sort_order", "is_active", "starts_at", "ends_at"]
+    list_filter = ["is_active"]
+    search_fields = ["title", "subtitle"]
